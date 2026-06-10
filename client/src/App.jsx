@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
 import { sendMessage } from "./api/gemini";
+import { analyzeImage } from "./api/vision";
 
 function App() {
     const [input, setInput] = useState("");
@@ -251,7 +252,7 @@ function App() {
         addLog("CAMERA DEACTIVATED");
     };
 
-    const captureFrame = () => {
+    const captureFrame = async () => {
         const video = videoRef.current;
         const canvas = canvasRef.current;
         if (!video || !canvas) return;
@@ -261,27 +262,37 @@ function App() {
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         const imageData = canvas.toDataURL("image/png");
         setCapturedImage(imageData);
-        setCaptureTime(new Date().toLocaleTimeString());
-        const objects = [
-            "PERSON",
-            "MONITOR",
-            "KEYBOARD",
-            "PHONE",
-            "LAPTOP",
-            "CHAIR",
-            "DESK",
-        ];
-
-        const randomObject =
-            objects[Math.floor(Math.random() * objects.length)];
-
-        const confidence = `${Math.floor(Math.random() * 15) + 85}%`;
+        setVisionData({
+            status: "ANALYZING",
+            object: "...",
+            confidence: "...",
+        });
         addLog("FRAME CAPTURED");
+        const result = await analyzeImage(imageData);
+        speak(result);
+        addLog("VISION ANALYSIS COMPLETE");
         setVisionData({
             status: "LOCKED",
-            object: randomObject,
-            confidence,
+            object: result,
+            confidence: "AI",
         });
+        setCaptureTime(new Date().toLocaleTimeString());
+    };
+
+    const askVision = async () => {
+        if (!capturedImage) return;
+        const result = await analyzeImage(
+            capturedImage,
+            "Describe everything visible in this image.",
+        );
+        setChat((prev) => [
+            ...prev,
+            {
+                role: "lunex",
+                text: result,
+            },
+        ]);
+        speak(result);
     };
 
     if (booting) {
@@ -588,8 +599,10 @@ function App() {
                         className="w-full mt-2 py-2 rounded-lg border border-emerald-400/30 text-emerald-200">
                         CAPTURE FRAME
                     </button>
-                    <button className="w-full mt-3 py-2 rounded-lg border border-fuchsia-400/30 text-fuchsia-200">
-                        ANALYSE IMAGE
+                    <button
+                        onClick={askVision}
+                        className="w-full mt-2 py-2 rounded-lg border border-fuchsia-400/30 text-fuchsia-200">
+                        ANALYSE
                     </button>
                     <button
                         onClick={() => {
