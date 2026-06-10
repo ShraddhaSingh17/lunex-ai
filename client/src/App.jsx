@@ -8,6 +8,14 @@ function App() {
     const [isListening, setIsListening] = useState(false);
     const [isThinking, setIsThinking] = useState(false);
     const [isTyping, setIsTyping] = useState(false);
+    const [capturedImage, setCapturedImage] = useState(null);
+    const [cameraActive, setCameraActive] = useState(false);
+    const [eventLogs, setEventLogs] = useState(["SYSTEM BOOT COMPLETE"]);
+    const [visionData, setVisionData] = useState({
+        status: "STANDBY",
+        object: "None",
+        confidence: "0%",
+    });
     const [booting, setBooting] = useState(true);
     const [metrics, setMetrics] = useState({
         cpu: 42,
@@ -17,6 +25,8 @@ function App() {
     const chatEndRef = useRef(null);
     const recognitionRef = useRef(null);
     const videoRef = useRef(null);
+    const canvasRef = useRef(null);
+    const streamRef = useRef(null);
 
     useEffect(() => {
         window.speechSynthesis.onvoiceschanged = () => {
@@ -39,6 +49,7 @@ function App() {
         recognition.onend = () => {
             console.log("Recognition ended");
             setIsListening(false);
+            addLog("VOICE LISTENING");
         };
 
         recognition.onerror = (event) => {
@@ -51,6 +62,7 @@ function App() {
         recognition.onresult = (event) => {
             const text = event.results[0][0].transcript;
             console.log("VOICE DETECTED:", text);
+            addLog(`COMMAND: ${text}`);
             setInput(text);
             handleSend(text);
         };
@@ -205,22 +217,60 @@ function App() {
         setInput("");
     };
 
+    const addLog = (message) => {
+        const time = new Date().toLocaleTimeString();
+        setEventLogs((prev) => [`[${time}] ${message}`, ...prev.slice(0, 7)]);
+    };
+
     const startCamera = async () => {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
                 video: true,
             });
+            streamRef.current = stream;
             if (videoRef.current) {
                 videoRef.current.srcObject = stream;
             }
+            setCameraActive(true);
+            addLog("CAMERA ACTIVATED");
         } catch (error) {
             console.error(error);
         }
     };
 
+    const stopCamera = () => {
+        if (streamRef.current) {
+            streamRef.current.getTracks().forEach((track) => track.stop());
+            streamRef.current = null;
+        }
+        if (videoRef.current) {
+            videoRef.current.srcObject = null;
+        }
+        setCameraActive(false);
+        addLog("CAMERA DEACTIVATED");
+    };
+
+    const captureFrame = () => {
+        const video = videoRef.current;
+        const canvas = canvasRef.current;
+        if (!video || !canvas) return;
+        const ctx = canvas.getContext("2d");
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const imageData = canvas.toDataURL("image/png");
+        setCapturedImage(imageData);
+        addLog("FRAME CAPTURED");
+        setVisionData({
+            status: "LOCKED",
+            object: "PERSON",
+            confidence: "92%",
+        });
+    };
+
     if (booting) {
         return (
-            <div className="h-screen bg-black text-cyan-300 flex items-center justify-center">
+            <div className="h-screen bg-black text-fuchsia-300 flex items-center justify-center">
                 <div className="w-[600px] max-w-[90%]">
                     <div className="text-2xl tracking-widest mb-8">
                         LUNEX INITIALIZATION
@@ -236,7 +286,7 @@ function App() {
                         initial={{ width: 0 }}
                         animate={{ width: "100%" }}
                         transition={{ duration: 4 }}
-                        className="h-1 bg-cyan-400 mt-8"
+                        className="h-1 bg-fuchsia-400 mt-8"
                     />
                 </div>
             </div>
@@ -244,19 +294,19 @@ function App() {
     }
     return (
         <div className="absolute inset-0 bg-black overflow-hidden flex flex-col">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(0,180,255,0.12),_transparent_60%)]"></div>
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(180,0,255,0.12),_transparent_60%)]"></div>
 
-            <div className="absolute inset-0 opacity-20 bg-[linear-gradient(to_right,rgba(0,180,255,0.15)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,180,255,0.15)_1px,transparent_1px)] bg-[size:60px_60px]"></div>
+            <div className="absolute inset-0 opacity-20 bg-[linear-gradient(to_right,rgba(180,0,255,0.15)_1px,transparent_1px),linear-gradient(to_bottom,rgba(180,0,255,0.15)_1px,transparent_1px)] bg-[size:60px_60px]"></div>
 
             <div className="absolute inset-0 pointer-events-none z-50">
-                <div className="absolute top-4 left-4 w-10 h-10 border-l border-t border-cyan-400/40"></div>
-                <div className="absolute top-4 right-4 w-10 h-10 border-r border-t border-cyan-400/40"></div>
-                <div className="absolute bottom-4 left-4 w-10 h-10 border-l border-b border-cyan-400/40"></div>
-                <div className="absolute bottom-4 right-4 w-10 h-10 border-r border-b border-cyan-400/40"></div>
+                <div className="absolute top-4 left-4 w-10 h-10 border-l border-t border-fuchsia-400/40"></div>
+                <div className="absolute top-4 right-4 w-10 h-10 border-r border-t border-fuchsia-400/40"></div>
+                <div className="absolute bottom-4 left-4 w-10 h-10 border-l border-b border-fuchsia-400/40"></div>
+                <div className="absolute bottom-4 right-4 w-10 h-10 border-r border-b border-fuchsia-400/40"></div>
             </div>
 
-            <div className="relative z-10 flex justify-between items-center px-6 py-4 border-b border-cyan-400/20 backdrop-blur-xl bg-black/30">
-                <div className="text-cyan-300 tracking-widest text-sm">
+            <div className="relative z-10 flex justify-between items-center px-6 py-4 border-b border-fuchsia-400/20 backdrop-blur-xl bg-black/30">
+                <div className="text-fuchsia-300 tracking-widest text-sm">
                     LUNEX CORE SYSTEM
                 </div>
 
@@ -296,7 +346,7 @@ function App() {
                             repeat: Infinity,
                             ease: "easeOut",
                         }}
-                        className="absolute inset-[-20px] rounded-full border border-cyan-400"
+                        className="absolute inset-[-20px] rounded-full border border-fuchsia-400"
                     />
                     <motion.div
                         animate={
@@ -316,7 +366,7 @@ function App() {
                             delay: 0.5,
                             ease: "easeOut",
                         }}
-                        className="absolute inset-[-20px] rounded-full border border-cyan-300/60"
+                        className="absolute inset-[-20px] rounded-full border border-fuchsia-300/60"
                     />
 
                     <motion.div
@@ -329,7 +379,7 @@ function App() {
                             repeat: Infinity,
                             ease: "linear",
                         }}
-                        className="absolute inset-[-20px] rounded-full border border-cyan-400/40"
+                        className="absolute inset-[-20px] rounded-full border border-fuchsia-400/40"
                     />
                     <motion.div
                         animate={{
@@ -341,7 +391,7 @@ function App() {
                             repeat: Infinity,
                             ease: "linear",
                         }}
-                        className="absolute inset-[-10px] rounded-full border border-cyan-300/50"
+                        className="absolute inset-[-10px] rounded-full border border-fuchsia-300/50"
                     />
 
                     <motion.div
@@ -352,24 +402,24 @@ function App() {
                             ease: "linear",
                         }}
                         className="absolute inset-0">
-                        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-cyan-300 shadow-[0_0_10px_rgba(0,255,255,0.8)]" />
+                        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-fuchsia-300 shadow-[0_0_10px_rgba(0,255,255,0.8)]" />
 
-                        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-cyan-300 shadow-[0_0_10px_rgba(0,255,255,0.8)]" />
+                        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-fuchsia-300 shadow-[0_0_10px_rgba(0,255,255,0.8)]" />
 
-                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-cyan-300 shadow-[0_0_10px_rgba(0,255,255,0.8)]" />
+                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-fuchsia-300 shadow-[0_0_10px_rgba(0,255,255,0.8)]" />
 
-                        <div className="absolute right-0 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-cyan-300 shadow-[0_0_10px_rgba(0,255,255,0.8)]" />
+                        <div className="absolute right-0 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-fuchsia-300 shadow-[0_0_10px_rgba(0,255,255,0.8)]" />
                     </motion.div>
 
                     <motion.div
                         animate={{
                             boxShadow: isListening
-                                ? "0 0 80px rgba(0,200,255,0.8)"
+                                ? "0 0 80px rgba(217,70,239,0.8)"
                                 : isThinking
-                                  ? "0 0 50px rgba(0,200,255,0.5)"
-                                  : "0 0 20px rgba(0,200,255,0.2)",
+                                  ? "0 0 50px rgba(217,70,239,0.5)"
+                                  : "0 0 20px rgba(217,70,239,0.2)",
                         }}
-                        className="absolute inset-0 rounded-full border border-cyan-300/30 bg-cyan-400/10"
+                        className="absolute inset-0 rounded-full border border-fuchsia-300/30 bg-fuchsia-400/10"
                     />
 
                     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
@@ -381,14 +431,14 @@ function App() {
                                       ? [1, 1.03, 1.06, 1.03, 1]
                                       : 1,
                             }}
-                            className="w-16 h-16 rounded-full bg-gradient-to-br from-cyan-300 to-blue-600"
+                            className="w-16 h-16 rounded-full bg-gradient-to-br from-fuchsia-300 to-purple-600"
                         />
                     </div>
 
                     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-white" />
                 </motion.div>
 
-                <div className="mt-8 text-center text-cyan-300 text-xs tracking-[0.3em]">
+                <div className="mt-8 text-center text-fuchsia-300 text-xs tracking-[0.3em]">
                     {isListening
                         ? "AWAITING COMMAND"
                         : isThinking
@@ -396,17 +446,17 @@ function App() {
                           : "SYSTEM READY"}
                 </div>
             </div>
-            <div className="absolute left-6 top-24 w-52">
-                <div className="bg-black/30 backdrop-blur-xl border border-cyan-400/20 rounded-xl p-4">
-                    <div className="text-cyan-300 text-xs tracking-widest mb-4">
+            <div className="absolute left-6 top-24 w-56">
+                <div className="bg-black/30 backdrop-blur-xl border border-fuchsia-400/20 rounded-xl p-4">
+                    <div className="text-fuchsia-300 text-xs tracking-widest mb-4">
                         SYSTEM METRICS
                     </div>
                     <div className="space-y-2 text-sm">
                         <div>
                             CPU
-                            <div className="h-1 bg-cyan-900 rounded mt-1">
+                            <div className="h-1 bg-fuchsia-900 rounded mt-1">
                                 <div
-                                    className="h-1 bg-cyan-400 rounded"
+                                    className="h-1 bg-fuchsia-400 rounded"
                                     style={{ width: `${metrics.cpu}%` }}
                                 />
                             </div>
@@ -414,9 +464,9 @@ function App() {
                         </div>
                         <div>
                             MEMORY
-                            <div className="h-1 bg-cyan-900 rounded mt-1">
+                            <div className="h-1 bg-fuchsia-900 rounded mt-1">
                                 <div
-                                    className="h-1 bg-cyan-400 rounded"
+                                    className="h-1 bg-fuchsia-400 rounded"
                                     style={{ width: `${metrics.memory}%` }}
                                 />
                             </div>
@@ -427,56 +477,160 @@ function App() {
                 </div>
             </div>
 
-            <div className="absolute right-6 top-24 w-52">
-                <div className="bg-black/30 backdrop-blur-xl border border-cyan-400/20 rounded-xl p-4">
-                    <div className="text-cyan-300 text-xs tracking-widest mb-4">
+            <div className="absolute right-6 top-24 w-56">
+                <div className="bg-black/30 backdrop-blur-xl border border-fuchsia-400/20 rounded-xl p-4">
+                    <div className="text-fuchsia-300 text-xs tracking-widest mb-4">
                         MODULE STATUS
                     </div>
                     <div className="space-y-2 text-sm">
                         <div className="text-green-400">● VOICE READY</div>
                         <div className="text-yellow-400">● MEMORY ACTIVE</div>
-                        <div className="text-red-400">● CAMERA OFFLINE</div>
-                        <div className="text-cyan-300">● AI ACTIVE</div>
+                        <div
+                            className={
+                                cameraActive ? "text-green-400" : "text-red-400"
+                            }>
+                            ●{" "}
+                            {cameraActive ? "CAMERA ONLINE" : "CAMERA OFFLINE"}
+                        </div>
+                        <div className="text-fuchsia-300">● AI ACTIVE</div>
                     </div>
                 </div>
             </div>
 
-            <div className="absolute left-6 top-[380px] w-52">
-                <div className="bg-black/30 backdrop-blur-xl border border-cyan-400/20 rounded-xl p-3">
-                    <div className="text-cyan-300 text-xs tracking-widest mb-3">
+            <div className="absolute right-6 top-[320px] w-56">
+                <div className="bg-black/30 backdrop-blur-xl border border-fuchsia-400/20 rounded-xl p-3">
+                    <div className="text-fuchsia-300 text-xs tracking-widest mb-3">
                         CAMERA VISION
                     </div>
                     <div className="relative">
+                        <motion.div
+                            animate={{
+                                top: ["0%", "100%", "0%"],
+                            }}
+                            transition={{
+                                duration: 3,
+                                repeat: Infinity,
+                                ease: "linear",
+                            }}
+                            className="absolute left-0 w-full h-[2px] bg-fuchsia-400/70 shadow-[0_0_10px_rgba(0,255,255,0.8)]"
+                        />
                         <video
                             ref={videoRef}
                             autoPlay
                             muted
                             playsInline
-                            className="w-full rounded-lg border border-cyan-400/20"
+                            className="w-full rounded-lg border border-fuchsia-400/20"
                         />
                         <div className="absolute inset-0 pointer-events-none">
-                            <div className="absolute top-1/2 left-1/2 w-24 h-24 -translate-x-1/2 -translate-y-1/2 border border-cyan-400/60 rounded-md" />
+                            <div className="absolute top-1/2 left-1/2 w-24 h-24 -translate-x-1/2 -translate-y-1/2 border border-fuchsia-400/60 rounded-md" />
                         </div>
-                        <div className="absolute top-2 left-2 w-5 h-5 border-l border-t border-cyan-400"></div>
-                        <div className="absolute top-2 right-2 w-5 h-5 border-r border-t border-cyan-400"></div>
-                        <div className="absolute bottom-2 left-2 w-5 h-5 border-l border-b border-cyan-400"></div>
-                        <div className="absolute bottom-2 right-2 w-5 h-5 border-r border-b border-cyan-400"></div>
-                        <div className="absolute bottom-2 left-2 text-[10px] text-cyan-300 tracking-widest">
-                        TARGET LOCK
-                    </div>
-                    <div className="absolute top-2 left-2 text-[10px] text-green-400 animate-pulse">
-                        SCANNING...
-                    </div>
+                        <div className="absolute top-2 left-2 w-5 h-5 border-l border-t border-fuchsia-400"></div>
+                        <div className="absolute top-2 right-2 w-5 h-5 border-r border-t border-fuchsia-400"></div>
+                        <div className="absolute bottom-2 left-2 w-5 h-5 border-l border-b border-fuchsia-400"></div>
+                        <div className="absolute bottom-2 right-2 w-5 h-5 border-r border-b border-fuchsia-400"></div>
+                        <div className="absolute bottom-2 left-2 text-[10px] text-fuchsia-300 tracking-widest">
+                            TARGET LOCK
+                        </div>
+                        <div className="absolute top-2 left-2 text-[10px] text-green-400 animate-pulse">
+                            SCANNING...
+                        </div>
+                        <div className="absolute top-2 right-2 text-[10px] text-red-400 animate-pulse">
+                            ● LIVE
+                        </div>
+                        <div className="absolute bottom-2 right-2 text-[10px] text-fuchsia-300">
+                            60 FPS
+                        </div>
                     </div>
                     <button
                         onClick={startCamera}
-                        className="w-full mt-3 py-2 rounded-lg border border-cyan-400/30 text-cyan-200">
+                        className="w-full mt-3 py-2 rounded-lg border border-fuchsia-400/30 text-fuchsia-200">
                         ACTIVATE
+                    </button>
+                    <button
+                        onClick={captureFrame}
+                        className="w-full mt-2 py-2 rounded-lg border border-emerald-400/30 text-emerald-200">
+                        CAPTURE FRAME
+                    </button>
+                    <button
+                        onClick={() => {
+                            setCapturedImage(null);
+                            setVisionData({
+                                status: "STANDBY",
+                                object: "NONE",
+                                confidence: "0%",
+                            });
+                        }}
+                        className="w-full mt-2 py-2 rounded-lg border border-red-400/30 text-red-200">
+                        DISCARD
+                    </button>
+                    <button
+                        onClick={stopCamera}
+                        className="w-full mt-2 py-2 rounded-lg border border-red-400/30 text-red-200">
+                        DEACTIVATE
                     </button>
                 </div>
             </div>
 
-            <div className="relative z-10 flex-1 overflow-y-auto p-6 space-y-3 ml-72 mr-6 mb-4 rounded-2xl border border-cyan-400/20 bg-black/20 backdrop-blur-xl">
+            <div className="absolute left-6 top-[320px] w-56">
+                <div className="bg-black/30 backdrop-blur-xl border border-fuchsia-400/20 rounded-xl p-4">
+                    <div className="text-fuchsia-300 text-xs tracking-widest mb-4">
+                        VISION ANALYSIS
+                    </div>
+                    <div className="space-y-2 text-sm">
+                        <div>
+                            STATUS:
+                            <span className="text-green-400 ml-2">
+                                {visionData.status}
+                            </span>
+                        </div>
+                        <div>
+                            OBJECT:
+                            <span className="text-fuchsia-300 ml-2">
+                                {visionData.object}
+                            </span>
+                        </div>
+                        <div>
+                            CONFIDENCE:
+                            <span className="text-yellow-300 ml-2">
+                                {visionData.confidence}
+                            </span>
+                        </div>
+                        {capturedImage && (
+                            <div className="mt-4">
+                                <div className="text-fuchsia-300 text-xs tracking-widest mb-2">
+                                    CAPTURED FRAME
+                                </div>
+                                <img
+                                    src={capturedImage}
+                                    alt="capture"
+                                    className="rounded-lg border border-fuchsia-400/20"
+                                />
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            <div className="absolute left-6 top-[500px] w-56">
+                <div className="bg-black/30 backdrop-blur-xl border border-fuchsia-400/20 rounded-xl p-4">
+                    <div className="text-fuchsia-300 text-xs tracking-widest mb-4">
+                        EVENT LOG
+                    </div>
+                    <div className="space-y-2 text-xs">
+                        {eventLogs.map((log, index) => (
+                            <div
+                                key={index}
+                                className="text-fuchsia-200 border-b border-fuchsia-400/10 pb-1">
+                                {log}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+
+            <canvas ref={canvasRef} className="hidden" />
+
+            <div className="relative z-10 flex-1 overflow-y-auto p-6 space-y-3 ml-72 mr-72 mb-4 rounded-2xl border border-fuchsia-400/20 bg-black/20 backdrop-blur-xl">
                 {chat.map((msg, i) => (
                     <motion.div
                         key={i}
@@ -485,7 +639,7 @@ function App() {
                         transition={{ duration: 0.3 }}
                         className={`max-w-[70%] p-3 rounded-xl backdrop-blur-md border ${
                             msg.role === "user"
-                                ? "ml-auto bg-cyan-500/10 border border-cyan-400/30 text-cyan-200 backdrop-blur-md shadow-[0_0_15px_rgba(0,200,255,0.15)]"
+                                ? "ml-auto bg-fuchsia-500/10 border border-fuchsia-400/30 text-fuchsia-200 backdrop-blur-md shadow-[0_0_15px_rgba(217,70,239,0.15)]"
                                 : "mr-auto bg-emerald-500/10 border border-emerald-400/30 text-emerald-200 backdrop-blur-md shadow-[0_0_15px_rgba(0,255,150,0.12)]"
                         }`}>
                         <>
@@ -521,10 +675,10 @@ function App() {
                 <div ref={chatEndRef} />
             </div>
 
-            <div className="relative z-10 p-4 border-t border-cyan-400/20 flex gap-2 backdrop-blur-xl bg-black/40">
+            <div className="relative z-10 p-4 border-t border-fuchsia-400/20 flex gap-2 backdrop-blur-xl bg-black/40">
                 <button
                     onClick={startListening}
-                    className="bg-red-500/20 px-4 py-2 hover:bg-red-500/30 border border-red-400/40 rounded-lg text-red-200 shadow-[0_0_10px_rgba(0,200,255,0.15)]">
+                    className="bg-red-500/20 px-4 py-2 hover:bg-red-500/30 border border-red-400/40 rounded-lg text-red-200 shadow-[0_0_10px_rgba(217,70,239,0.15)]">
                     Talk
                 </button>
 
@@ -532,7 +686,7 @@ function App() {
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     placeholder="Ask LUNEX..."
-                    className="flex-1 p-3 bg-black/40 border border-cyan-400/30 text-white rounded-lg outline-none focus:border-cyan-300 focus:shadow-[0_0_10px_rgba(0,200,255,0.2)]"
+                    className="flex-1 p-3 bg-black/40 border border-fuchsia-400/30 text-white rounded-lg outline-none focus:border-fuchsia-300 focus:shadow-[0_0_10px_rgba(217,70,239,0.2)]"
                     onKeyDown={(e) => e.key === "Enter" && handleSend()}
                 />
 
@@ -540,7 +694,7 @@ function App() {
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={handleSend}
-                    className="px-6 py-2 bg-cyan-500/20 hover:bg-cyan-400/30 border border-cyan-400/40 rounded-lg text-cyan-200 shadow-[0_0_10px_rgba(0,200,255,0.15)]">
+                    className="px-6 py-2 bg-fuchsia-500/20 hover:bg-fuchsia-400/30 border border-fuchsia-400/40 rounded-lg text-fuchsia-200 shadow-[0_0_10px_rgba(217,70,239,0.15)]">
                     EXECUTE
                 </motion.button>
             </div>
