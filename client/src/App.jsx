@@ -10,6 +10,7 @@ function App() {
     const [isTyping, setIsTyping] = useState(false);
     const [capturedImage, setCapturedImage] = useState(null);
     const [cameraActive, setCameraActive] = useState(false);
+    const [captureTime, setCaptureTime] = useState("--");
     const [eventLogs, setEventLogs] = useState(["SYSTEM BOOT COMPLETE"]);
     const [visionData, setVisionData] = useState({
         status: "STANDBY",
@@ -125,7 +126,7 @@ function App() {
         speech.voice = preferredVoice;
 
         speech.lang = "en-US";
-        speech.rate = 1.25;
+        speech.rate = 1.5;
         speech.pitch = 1.1;
         speech.volume = 1;
         window.speechSynthesis.speak(speech);
@@ -260,11 +261,26 @@ function App() {
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         const imageData = canvas.toDataURL("image/png");
         setCapturedImage(imageData);
+        setCaptureTime(new Date().toLocaleTimeString());
+        const objects = [
+            "PERSON",
+            "MONITOR",
+            "KEYBOARD",
+            "PHONE",
+            "LAPTOP",
+            "CHAIR",
+            "DESK",
+        ];
+
+        const randomObject =
+            objects[Math.floor(Math.random() * objects.length)];
+
+        const confidence = `${Math.floor(Math.random() * 15) + 85}%`;
         addLog("FRAME CAPTURED");
         setVisionData({
             status: "LOCKED",
-            object: "PERSON",
-            confidence: "92%",
+            object: randomObject,
+            confidence,
         });
     };
 
@@ -503,17 +519,27 @@ function App() {
                         CAMERA VISION
                     </div>
                     <div className="relative">
-                        <motion.div
-                            animate={{
-                                top: ["0%", "100%", "0%"],
-                            }}
-                            transition={{
-                                duration: 3,
-                                repeat: Infinity,
-                                ease: "linear",
-                            }}
-                            className="absolute left-0 w-full h-[2px] bg-fuchsia-400/70 shadow-[0_0_10px_rgba(0,255,255,0.8)]"
-                        />
+                        {cameraActive && (
+                            <motion.div
+                                animate={{
+                                    top: ["0%", "100%", "0%"],
+                                }}
+                                transition={{
+                                    duration: 3,
+                                    repeat: Infinity,
+                                    ease: "linear",
+                                }}
+                                className="absolute left-0 right-0 w-full h-[2px] bg-fuchsia-400/70 shadow-[0_0_10px_rgba(217,70,239,0.8)]"
+                            />
+                        )}
+                        {cameraActive && (
+                            <div className="absolute top-8 left-3 text-[10px] text-fuchsia-300 space-y-1 font-mono">
+                                <div>TARGET ID: 0021</div>
+                                <div>STATUS: TRACKING</div>
+                                <div>LATENCY: 12ms</div>
+                                <div>SIGNAL: 98%</div>
+                            </div>
+                        )}
                         <video
                             ref={videoRef}
                             autoPlay
@@ -521,18 +547,29 @@ function App() {
                             playsInline
                             className="w-full rounded-lg border border-fuchsia-400/20"
                         />
-                        <div className="absolute inset-0 pointer-events-none">
-                            <div className="absolute top-1/2 left-1/2 w-24 h-24 -translate-x-1/2 -translate-y-1/2 border border-fuchsia-400/60 rounded-md" />
+                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
+                            <motion.div
+                                animate={{
+                                    x: [-5, 5, -5],
+                                    y: [3, -3, 3],
+                                }}
+                                transition={{
+                                    duration: 4,
+                                    repeat: Infinity,
+                                    ease: "linear",
+                                }}
+                                className="w-24 h-24 border border-fuchsia-400/60 rounded-md"
+                            />
                         </div>
                         <div className="absolute top-2 left-2 w-5 h-5 border-l border-t border-fuchsia-400"></div>
                         <div className="absolute top-2 right-2 w-5 h-5 border-r border-t border-fuchsia-400"></div>
                         <div className="absolute bottom-2 left-2 w-5 h-5 border-l border-b border-fuchsia-400"></div>
                         <div className="absolute bottom-2 right-2 w-5 h-5 border-r border-b border-fuchsia-400"></div>
                         <div className="absolute bottom-2 left-2 text-[10px] text-fuchsia-300 tracking-widest">
-                            TARGET LOCK
+                            {cameraActive ? "TARGET LOCK" : "STANDBY"}
                         </div>
                         <div className="absolute top-2 left-2 text-[10px] text-green-400 animate-pulse">
-                            SCANNING...
+                            {cameraActive ? "SCANNING..." : "OFFLINE"}
                         </div>
                         <div className="absolute top-2 right-2 text-[10px] text-red-400 animate-pulse">
                             ● LIVE
@@ -550,6 +587,9 @@ function App() {
                         onClick={captureFrame}
                         className="w-full mt-2 py-2 rounded-lg border border-emerald-400/30 text-emerald-200">
                         CAPTURE FRAME
+                    </button>
+                    <button className="w-full mt-3 py-2 rounded-lg border border-fuchsia-400/30 text-fuchsia-200">
+                        ANALYSE IMAGE
                     </button>
                     <button
                         onClick={() => {
@@ -577,46 +617,47 @@ function App() {
                         VISION ANALYSIS
                     </div>
                     <div className="space-y-2 text-sm">
-                        <div>
+                        <div className="flex justify-between">
                             STATUS:
                             <span className="text-green-400 ml-2">
                                 {visionData.status}
                             </span>
                         </div>
-                        <div>
+                        <div className="flex justify-between">
                             OBJECT:
                             <span className="text-fuchsia-300 ml-2">
                                 {visionData.object}
                             </span>
                         </div>
-                        <div>
+                        <div className="flex justify-between">
                             CONFIDENCE:
                             <span className="text-yellow-300 ml-2">
                                 {visionData.confidence}
                             </span>
                         </div>
+                        <div className="flex justify-between">
+                            TIME:
+                            <span className="text-fuchsia-300 ml-2">
+                                {captureTime}
+                            </span>
+                        </div>
                         {capturedImage && (
-                            <div className="mt-4">
+                            <div className="max-h-32 overflow-y-auto mt-3">
                                 <div className="text-fuchsia-300 text-xs tracking-widest mb-2">
                                     CAPTURED FRAME
                                 </div>
-                                <img
-                                    src={capturedImage}
-                                    alt="capture"
-                                    className="rounded-lg border border-fuchsia-400/20"
-                                />
                             </div>
                         )}
                     </div>
                 </div>
             </div>
 
-            <div className="absolute left-6 top-[500px] w-56">
-                <div className="bg-black/30 backdrop-blur-xl border border-fuchsia-400/20 rounded-xl p-4">
+            <div className="absolute left-6 top-[560px] w-56 h-48">
+                <div className="bg-black/30 backdrop-blur-xl border border-fuchsia-400/20 rounded-xl p-4 h-full">
                     <div className="text-fuchsia-300 text-xs tracking-widest mb-4">
                         EVENT LOG
                     </div>
-                    <div className="space-y-2 text-xs">
+                    <div className="overflow-y-auto h-[120px] space-y-2 text-xs">
                         {eventLogs.map((log, index) => (
                             <div
                                 key={index}
